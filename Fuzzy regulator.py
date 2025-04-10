@@ -11,27 +11,7 @@ class FuzzyRegulator(fl.mamfis):
         self._output_scaler = MinMaxScaler()
 
         super().__init__()
-
-        self.addInput([-1, 1], Name='Deviation')
-
-        self.addMF('Deviation', 'gaussmf', [0.4, -1], Name='N')
-        self.addMF('Deviation', 'gaussmf', [0.4, 0], Name='Z')
-        self.addMF('Deviation', 'gaussmf', [0.4, 1], Name='P')
-
-        self.addInput([-1, 1], Name='dH/dt')
-
-        self.addMF('dH/dt', 'gaussmf', [0.4, -1], Name='N')
-        self.addMF('dH/dt', 'gaussmf', [0.4, 0], Name='Z')
-        self.addMF('dH/dt', 'gaussmf', [0.4, 1], Name='P')
-
-        self.addOutput([-1, 1], Name='U')
-
-        self.addMF('U', 'gaussmf', [0.2, -1], Name='close_fast')
-        self.addMF('U', 'gaussmf', [0.2, -0.5], Name='close_slowly')
-        self.addMF('U', 'gaussmf', [0.2, 0], Name='dont_touch')
-        self.addMF('U', 'gaussmf', [0.2, 0.5], Name='open_slowly')
-        self.addMF('U', 'gaussmf', [0.2, 1], Name='open_fast')
-
+        
         rule_list = [
             [1, 1, 5, 1, 1], #Если отклонение - отрицательное и Скорость изменения - отрицательная, то открывать быстро.
             [1, 2, 5, 1, 1], #Если отклонение - отрицательное и Скорость изменения - околонулевая, то открывать медленно.
@@ -47,36 +27,45 @@ class FuzzyRegulator(fl.mamfis):
         ]
         self.addRule(rule_list)
 
+    # В метод передаётся двумерный список списков, в которых
+    # хранятся новые параметры для функцияй принадлежности.
     def set_params(self, new_params):
         for input in range(len(self.Inputs)):
             for mf in range(len(self.Inputs[input].MembershipFunctions)):
                 self.Inputs[input].MembershipFunctions[mf].Parameters = new_params[input][mf]
 
+    # Возвращает параметры действующих функций принадлежности.
     def get_params(self):
         params = []
         for input in range(len(self.Inputs)):
             for mf in range(len(self.Inputs[input].MembershipFunctions)):
                 params.append(self.Inputs[input].MembershipFunctions[mf].Parameters)
         return params
-        
+
+    # Расчитывает управляющее воздействие на основе предоставленных данных.    
     def predict(self, data):
         results = pd.Series()
         scaled_data = pd.DataFrame(columns=data.columns)
 
+        #Нормализуем переданные данные.
         for col in data.columns:
             scaled_data[col] = self.scale(data[col], max(abs(data[col].min()), abs(data[col].max())))
-
+        
         for row in scaled_data.shape[0]:
+            #Список, в который будут добавляться значения в ужном порядке.
             values = []
-
             for i in range(scaled_data.shape[1]):
-                name = self.Inputs[0].Name
+                #Получаем имя нечёткого множества.
+                name = self.Inputs[i].Name
+                #По этому имени обращаемся к нужному столбцу датафрэйма
+                #и добавляем значение из нужной строки в список значений.
                 values.append(scaled_data[name][row])
-
+            #Расчёт.
             results[row] = fl.evalfis(self, values)
 
         return results
     
+    #Добавляет входную нечёткую переменную с некоторым количеством множеств.
     def add_input(self, name, diaposone, sets_parameters):
         if diaposone == "Z-O":
             self.addInput([0, 1], Name=name)
@@ -88,6 +77,7 @@ class FuzzyRegulator(fl.mamfis):
         for i in range(len(sets_parameters)):
             self.addMF(name, 'gaussmf', sets_parameters[i])
 
+    #Добавляет выходную нечёткую переменную с некоторым количеством множеств.
     def add_output(self, name, diaposone, sets_parameters):
         if diaposone == "Z-O":
             self.addOutput([0, 1], Name=name)
@@ -99,16 +89,20 @@ class FuzzyRegulator(fl.mamfis):
         for i in range(len(sets_parameters)):
             self.addMF(name, 'gaussmf', sets_parameters[i])
 
+    #Считает ошибку.
     def score(self, xTest, yTest):
         xResults = self.predict(xTest)
         return mean_absolute_error(xResults, yTest)
     
+    #Нормализует переданные данные по указанному диапозону.
     def scale(self, data_series, dev_by_zero):
         self._input_scaler.fit(-dev_by_zero, dev_by_zero)
         scaledData = self._input_scaler.transform(data_series)
         return scaledData
 
-    def unscale(self, scaled_data):
+    #Денормализует переданные данные в указанный диапозон.
+    def unscale(self, scaled_data, dev_by_zero):
+        self._input_scaler.fit(-dev_by_zero, dev_by_zero)
         return self._input_scaler.inverse_transform(scaled_data)
         
 fr = FuzzyRegulator(0, 2)
