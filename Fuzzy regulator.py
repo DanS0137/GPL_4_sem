@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd # type: ignore
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error
-import plotly.graph_objects as go
+import plotly.graph_objects as go # type: ignore
 
 class FuzzyRegulator(fl.mamfis):
     def __init__(self):
@@ -29,26 +29,23 @@ class FuzzyRegulator(fl.mamfis):
         return params
 
     # Расчитывает управляющее воздействие на основе предоставленных данных.    
-    def predict(self, data):
+    def predict(self, scaled_data):
         results = pd.Series()
-        scaled_data = pd.DataFrame(columns=data.columns)
-        '''
-        #Нормализуем переданные данные.
-        for col in data.columns:
-            scaled_data[col] = self.scale(data[col], [[-max(abs(data[col].min()), abs(data[col].max()))],
-                                                        [max(abs(data[col].min()), abs(data[col].max()))]])
-        '''        
-        for row in range(data.shape[0]):
-            #Список, в который будут добавляться значения в ужном порядке.
+
+        for row in range(scaled_data.shape[0]):
+
+            #Список, в который будут добавляться значения в нужном порядке.
             values = []
-            for i in range(data.shape[1]):
+
+            for i in range(scaled_data.shape[1]):
                 #Получаем имя нечёткого множества.
                 name = self.Inputs[i].Name
+
                 #По этому имени обращаемся к нужному столбцу датафрэйма
                 #и добавляем значение из нужной строки в список значений.
-                values.append(data[name][row])
-            #Расчёт.
+                values.append(float(scaled_data[name].iloc[row]))
 
+            #Расчёт.
             results[row] = fl.evalfis(self, values)
 
         return results
@@ -87,13 +84,13 @@ class FuzzyRegulator(fl.mamfis):
         return mean_absolute_error(xResults, yTest)
     
     #Нормализует переданные данные по указанному диапозону.
-    def scale(self, data, range, feature_range="NO-PO"):
+    def scale(self, data, from_range, feature_range="NO-PO"):
         if feature_range=="NO-PO":
             self._scaler.set_params(**{"feature_range":(-1,1)})
         if feature_range=="Z-O":
             self._scaler.set_params(**{"feature_range":(0,1)})
             
-        self._scaler.fit(np.array(data).reshape(-1,1))
+        self._scaler.fit(from_range)
         scaledData = self._scaler.transform(np.array(data).reshape(-1,1))
         return pd.Series(scaledData.flatten())
 
@@ -105,7 +102,7 @@ class FuzzyRegulator(fl.mamfis):
             self._unscaler.set_params(**{"feature_range":(0,1)})
 
         self._unscaler.fit(range)
-        return self._unscaler.inverse_transform(scaled_data)
+        return self._unscaler.inverse_transform(np.array(scaled_data, dtype=float).reshape(-1,1))
         
 fr = FuzzyRegulator()
 
@@ -140,12 +137,21 @@ rule_list=[
 ]
 fr.add_rules(rule_list)
 
-#Расчитываем.
-data = pd.read_excel("C:/Users/Admin/Desktop/GPL_4_sem/data.xlsx")
+#Считываем данные.
+data = pd.read_excel("C:/Users/User/Desktop/Учёба/4-ый сем/ГПО/GPL_4_sem/data.xlsx")
 df = pd.DataFrame(data)
-results = fr.predict(df[['dH', 'dV']])
+#Нормализуем их.
+scaled_data = pd.DataFrame(columns=[df.columns])
+for col in df.columns:
+    #scaled_data[col] = fr.scale(df[col], [[-max(abs(df[col].min()), abs(df[col].max()))],
+    #                                            [max(abs(df[col].min()), abs(df[col].max()))]])
+    scaled_data[col] = fr.scale(df[col], [[-1.06], [1.05]])
+            
+#Расчитываем.
+results = fr.predict(scaled_data[['dH', 'dV']])
 print(fr.score(df[['dH','dV']], df['Command']))
-
+print(mean_absolute_error(results,df['Command']))
+'''
 #Отрисовываем.
 X = fl.arange(0, 1, 200)
 Y = fl.arange(0, 1, 200)
@@ -156,3 +162,4 @@ for x in X:
 fig = go.Figure(data=[go.Surface(x=X, y=Y, z=Z)])
 
 fig.show()
+'''
