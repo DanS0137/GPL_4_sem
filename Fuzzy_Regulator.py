@@ -28,7 +28,9 @@ class FuzzyRegulator(fl.mamfis):
                 params.append(self.Inputs[input].MembershipFunctions[mf].Parameters)
         return params
 
-    # Расчитывает управляющее воздействие на основе предоставленных данных.    
+    # Расчитывает управляющее воздействие на основе предоставленных данных.
+    # Названия столбцов в переданном объекте pandas.DataFrame ДОЛЖНЫ СОВПАДАТЬ
+    # с названиями объявленных входных переменных.
     def predict(self, scaled_data):
         results = pd.Series()
 
@@ -84,6 +86,13 @@ class FuzzyRegulator(fl.mamfis):
         return mean_absolute_error(xResults, yTest)
     
     #Нормализует переданные данные по указанному диапозону.
+    #Первый параметр - переданные данные, которые нужно нормализовать.
+    #Второй параметр - диапозон, ИЗ которого нужно нормализовать,
+    #например, есть переменная, обозначающая уровень воды в баке объёмом
+    #600 л., в таком случае нужно указать диапозон [[0],[600]].
+    #Третий параметр - диапозон, к которому приводится переменная:
+    #возможные значения: "NO-PO" - от -1 до +1 и "Z-O" - от 0 до +1.
+    #Возвращает объект класса pandas.Series.
     def scale(self, data, from_range, feature_range="NO-PO"):
         if feature_range=="NO-PO":
             self._scaler.set_params(**{"feature_range":(-1,1)})
@@ -95,13 +104,18 @@ class FuzzyRegulator(fl.mamfis):
         return pd.Series(scaledData.flatten())
 
     #Денормализует переданные данные в указанный диапозон.
-    def unscale(self, scaled_data, range, feature_range="NO-PO"):
+    #Первый параметр - нормаизованные данные, которые нужно привести в некий диапозон.
+    #Второй параметр - диапозон, В который нужно привести переменную.
+    #Третий параметр - диапозон, из которого денормадизуется переменная:
+    #возможные значения: "NO-PO" - от -1 до +1 и "Z-O" - от 0 до +1.
+    #Возвращает объект класса pandas.Series.
+    def unscale(self, scaled_data, to_range, feature_range="NO-PO"):
         if feature_range=="NO-PO":
             self._unscaler.set_params(**{"feature_range":(-1,1)})
         if feature_range=="Z-O":
             self._unscaler.set_params(**{"feature_range":(0,1)})
 
-        self._unscaler.fit(range)
+        self._unscaler.fit(to_range)
         return self._unscaler.inverse_transform(np.array(scaled_data, dtype=float).reshape(-1,1))
         
 fr = FuzzyRegulator()
