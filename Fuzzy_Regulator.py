@@ -138,7 +138,7 @@ rule_list=[
 fr.add_rules(rule_list)
 
 #Считываем данные.
-data = pd.read_excel("C:/Users/User/Desktop/Учёба/4-ый сем/ГПО/GPL_4_sem/data.xlsx")
+data = pd.read_excel("C:/Users/Admin/Desktop/GPL_4_sem/data.xlsx")
 df = pd.DataFrame(data)
 #Нормализуем их.
 scaled_data = pd.DataFrame(columns=[df.columns])

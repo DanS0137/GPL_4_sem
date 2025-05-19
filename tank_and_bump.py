@@ -1,4 +1,5 @@
 import Fuzzy_Regulator as FR
+import fuzzylab as fl
 
 #Ёмкость.
 tank = FR.FuzzyRegulator()
@@ -29,12 +30,14 @@ tank.add_rules(rule_list)
 #Насос.
 bump = FR.FuzzyRegulator()
 parameters = [
-    [-1, 0.4],
-    [0, 0.4],
-    [1, 0.4]
+    [0.4, -1],
+    [0.4, 0],
+    [0.4, 1]
 ]
-bump.add_input('dV', 'NO-PO', parameters)
-bump.add_input('dU', 'NO-PO', parameters)
+bump.add_input('input_1', 'NO-PO', parameters)
+bump.add_input('input_2', 'NO-PO', parameters)
+fl.plotmf(bump, 'input', 1)
+fl.plotmf(bump, 'input', 2)
 parameters = [
     [-1, 0, 0.25],
     [0, 0.25, 0.5],
